@@ -255,6 +255,9 @@ class SyntaxAnalyzer:
             elif token_type == "FUNCTION_CALL":
                 if not self.parse_function_call():
                     return False
+            
+            elif token_type == "BREAK":
+                self.match("BREAK")
 
             # Consume unexpected tokens to prevent errors
             else:
