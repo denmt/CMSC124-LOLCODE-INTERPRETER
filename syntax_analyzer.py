@@ -203,38 +203,49 @@ class SyntaxAnalyzer:
 
     def parse_function_definition(self):
         """Parse function definition."""
-        if not self.match("FUNCTION_DEF"):  # Expecting 'HOW IZ I'
+        # Expecting 'HOW IZ I' to define a function
+        if not self.match("FUNCTION_DEF"):  
             print("Error: Expected 'HOW IZ I'.")
             return False
-        
-        # Match the function name
-        if not self.match("FUNCTION_IDENTIFIER"):  # Function name
+
+        # Expecting a function name
+        if not self.match("FUNCTION_IDENTIFIER"):  
             print("Error: Expected function name.")
             return False
 
-        # Collect function parameters
-        while True:
+        # Handle optional parameters
+        if self.match("DELIMITER"):  # Expecting 'YR'
             if not self.match("VARIABLE_IDENTIFIER"):
-                break
+                print("Error: Expected a parameter.")
+                return False
 
-        # Parse function body until FUNCTION_END
+            # Handle additional parameters with 'AN'
+            while self.match("OPERATOR_SEPARATOR"):  
+                if not self.match("DELIMITER"):  # Expecting 'YR'
+                    print("Error: Expected parameter with 'YR'.")
+                    return False
+                if not self.match("VARIABLE_IDENTIFIER"):
+                    print("Error: Expected a parameter.")
+                    return False
+
+        # Parse the function body until 'IF U SAY SO'
         while self.get_current_token():
             if self.match("FUNCTION_END"):  # Expecting 'IF U SAY SO'
                 return True
 
             token_type = self.get_current_token()[0]
 
-            # Check for a RETURN statement
+            # Handle return statements
             if token_type == "RETURN":
                 if not self.parse_return():
                     return False
-                
-            # Handle OUTPUT statements
+
+            # Handle output statements
             elif token_type == "OUTPUT_KEYWORD":
                 if not self.parse_output_statement():
                     return False
 
-            # Handle INPUT statements
+            # Handle input statements
             elif token_type == "INPUT_KEYWORD":
                 if not self.parse_input_statement():
                     return False
@@ -243,31 +254,34 @@ class SyntaxAnalyzer:
             elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT"]:
                 if not self.parse_expression():
                     return False
-            
+
+            # Handle IF statements
             elif token_type == "IF_START":
                 if not self.parse_if_statement():
                     return False
 
+            # Handle loops
             elif token_type == "LOOP_START":
                 if not self.parse_loop_statement():
                     return False
-            
+
+            # Handle function calls
             elif token_type == "FUNCTION_CALL":
                 if not self.parse_function_call():
                     return False
-            
-            elif token_type == "BREAK":
-                self.match("BREAK")
 
-            # Consume unexpected tokens to prevent errors
+            # Handle breaks
+            elif token_type == "BREAK":
+                self.consume()
+
+            # Handle unexpected tokens to avoid errors
             else:
                 print(f"Warning: Unexpected token '{token_type}' inside function body.")
                 self.consume()
 
+        # If 'IF U SAY SO' is not found
         print("Error: Missing 'IF U SAY SO' to end the function definition.")
         return False
-
-
 
     def parse_function_call(self):
         """Parse function call."""
@@ -278,14 +292,22 @@ class SyntaxAnalyzer:
         if not self.match("FUNCTION_IDENTIFIER"):
             print("Error: Expected function name.")
             return False
+        
+        # Handle optional parameters
+        if self.match("DELIMITER"):  # Expecting 'YR'
+            if not self.match("VARIABLE_IDENTIFIER"):
+                print("Error: Expected a parameter.")
+                return False
 
-        if not self.match("VARIABLE_IDENTIFIER"):
-            print("Error: Expected a variable.")
-            return False
-        else:
-            while self.match("VARIABLE_IDENTIFIER"):
-                self.consume()
-
+            # Handle additional parameters with 'AN'
+            while self.match("OPERATOR_SEPARATOR"):  
+                if not self.match("DELIMITER"):  # Expecting 'YR'
+                    print("Error: Expected parameter with 'YR'.")
+                    return False
+                if not self.match("VARIABLE_IDENTIFIER"):
+                    print("Error: Expected a parameter.")
+                    return False
+        
         return True
     
     def parse_return(self):
