@@ -57,6 +57,7 @@ TOKENS = [
     ("DELIMITER", r"YR"),  # Delimiter
     ("ASSIGNMENT", r"R"),  # Variable assignment
     ("TYPE_ASSIGNMENT", r"A"),  # Type assignment
+    ("PRINT_CAT", r"\+"),  # Print concatenation
     ("VARIABLE_IDENTIFIER", r"\b\w+\b"),  # Variable identifier
     ("WHITESPACE", r"[ \t]+"),  # Ignore whitespace
     ("NEWLINE", r"\n"),  # Newline for end of statement
