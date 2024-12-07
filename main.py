@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import scrolledtext
-import lexical_analyzer
 from tkinter import filedialog, messagebox
-from syntax_analyzer import SyntaxAnalyzer  # Import the syntax analyzer
-from semantic_analyzer import SemanticAnalyzer  # Import the semantic analyzer
+from tkinter import ttk 
+import lexical_analyzer
+from syntax_analyzer import SyntaxAnalyzer
+from semantic_analyzer import SemanticAnalyzer
 
 def loadfile():
     # Open file dialog to select a file
@@ -40,8 +41,9 @@ def execute():
             messagebox.showinfo("Success", "Syntax is correct!")
         else:
             messagebox.showerror("Error", "Syntax error in code!")
-            return  # Stop further processing if syntax is incorrect
-        
+            
+            return # Stop further processing if syntax is incorrect
+
         # Create an instance of SemanticAnalyzer to perform semantic checks and execute the code
         semantic_analyzer = SemanticAnalyzer(tokens)
         
@@ -55,10 +57,14 @@ def execute():
         for token in tokens:
             token_output.insert(tk.END, f"{token}\n")
         
-        # Display the symbol table in the token output area (for debugging purposes)
-        symbol_table_output.delete(1.0, tk.END)
+
+        # Clear the symbol table before inserting new values
+        for row in symbol_table.get_children():
+            symbol_table.delete(row)
+
+        # Display the symbol table in the Treeview widget
         for var, value in semantic_analyzer.symbol_table.items():
-            symbol_table_output.insert(tk.END, f"{var}: {value}\n")
+            symbol_table.insert("", "end", values=(var, value))
         
         # Display the console output (for VISIBLE statements)
         console_output.delete(1.0, tk.END)
@@ -100,11 +106,15 @@ token_output_label.pack()
 token_output = scrolledtext.ScrolledText(right_column, wrap=tk.WORD, height=10, bg="#f5f5f5")
 token_output.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
 
-# Symbol Table display
+# Symbol Table display 
 symbol_table_label = tk.Label(right_column, text="Symbol Table:")
 symbol_table_label.pack()
-symbol_table_output = scrolledtext.ScrolledText(right_column, wrap=tk.WORD, height=10, bg="#f5f5f5")
-symbol_table_output.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
+
+symbol_table = ttk.Treeview(right_column, columns=("Variable", "Value"), show="headings", height=10)
+symbol_table.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
+
+symbol_table.heading("Variable", text="Variable")
+symbol_table.heading("Value", text="Value")
 
 # Console output (for VISIBLE statements)
 console_output_label = tk.Label(right_column, text="Console Output:")
