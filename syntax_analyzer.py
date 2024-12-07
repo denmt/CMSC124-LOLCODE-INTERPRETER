@@ -67,7 +67,14 @@ class SyntaxAnalyzer:
                 return False
 
             if self.match("VARIABLE_ASSIGNMENT"):  # Expecting 'ITZ'
-                if not self.parse_arithmetic_op():
+                if not self.parse_literal():
+                    print("Error: Invalid variable initialization.")
+                elif not self.parse_arithmetic_op():
+                    print("Error: Invalid variable initialization.")
+                elif not self.parse_boolean_op():
+                    print("Error: Invalid variable initialization.")
+                elif not self.parse_comparison_op():
+                    print("Error: Invalid variable initialization.")
                     return False
 
         return True
@@ -115,6 +122,10 @@ class SyntaxAnalyzer:
             elif token_type == "FUNCTION_CALL":
                 if not self.parse_function_call():
                     return False
+            
+            elif token_type == "VARIABLE_IDENTIFIER":
+                if not self.parse_assignment():
+                    return False
 
             else:
                 print(f"Error: Unexpected token '{token_type}'.")
@@ -160,6 +171,26 @@ class SyntaxAnalyzer:
             print("Error: Expected a variable for GIMMEH.")
             return False
         return True
+    
+    def parse_assignment(self):
+        """Parse variable assignment."""
+        if not self.match("VARIABLE_IDENTIFIER"):
+            print("Error: Expected a variable identifier.")
+            return False
+        if not self.match("ASSIGNMENT"):  # Expecting 'R'
+            print("Error: Expected 'R'.")
+            return False
+        
+        token_type = self.get_current_token()[0]
+        if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
+            self.parse_literal()
+        elif token_type == "VARIABLE_IDENTIFIER":
+            self.match("VARIABLE_IDENTIFIER")
+        else:
+            if not self.parse_statements():
+                print("Error: Invalid assignment value.")
+                return False
+        return True
 
     def parse_arithmetic_op(self):
         """Parse a basic expression like NUMBR, SUM OF, etc."""
@@ -171,10 +202,35 @@ class SyntaxAnalyzer:
                 return False
             if not self.parse_operand():
                 return False
+            else:
+                if not self.parse_operand():
+                    return False
         else:
+            return False
+        
+        return True
+    
+    def parse_boolean_op(self):
+        '''Parse boolean operations'''
+        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR") or self.match("BOOL_NOT"):
             if not self.parse_operand():
                 return False
-        return True
+            if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
+                print("Error: Expected 'AN'.")
+                return False
+            if not self.parse_operand():
+                return False
+        elif self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF"):
+            while self.match("CLOSING_KEYWORD"):
+                if not self.parse_operand():
+                    return False
+                if not self.match("OPERATOR_SEPARATOR"):
+                    print("Error: Expected 'AN'.")
+                    return False
+                if not self.parse_operand():
+                    return False
+                
+                
 
     def parse_comparison_op(self):
         """Parse a comparison expression."""
