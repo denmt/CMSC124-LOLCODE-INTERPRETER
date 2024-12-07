@@ -3,6 +3,7 @@ from tkinter import scrolledtext
 import lexical_analyzer
 from tkinter import filedialog, messagebox
 from syntax_analyzer import SyntaxAnalyzer  # Import the syntax analyzer
+from semantic_analyzer import SemanticAnalyzer  # Import the semantic analyzer
 
 def loadfile():
     # Open file dialog to select a file
@@ -16,10 +17,9 @@ def loadfile():
         text_editor.insert(1.0, content)
 
 def tokenize(content):
-    # Save file content in a list and remove white space
+    """Save file content in a list and remove white space."""
     program = content.split('\n')
     program = [line.strip() for line in program]
-    
     return lexical_analyzer.lexical_analyzer(program)
 
 def execute():
@@ -30,6 +30,7 @@ def execute():
         return
 
     try:
+        # Tokenize the code
         tokens = tokenize(code)
         
         # Create an instance of SyntaxAnalyzer and parse the tokens
@@ -39,46 +40,76 @@ def execute():
             messagebox.showinfo("Success", "Syntax is correct!")
         else:
             messagebox.showerror("Error", "Syntax error in code!")
+            return  # Stop further processing if syntax is incorrect
         
+        # Create an instance of SemanticAnalyzer to perform semantic checks and execute the code
+        semantic_analyzer = SemanticAnalyzer(tokens)
+        
+        if semantic_analyzer.parse():  # Check if semantic analysis passes
+            messagebox.showinfo("Success", "Program executed successfully!")
+        else:
+            messagebox.showerror("Error", "Semantic error in code!")
+
         # Token output display
         token_output.delete(1.0, tk.END)
         for token in tokens:
             token_output.insert(tk.END, f"{token}\n")
+        
+        # Display the symbol table in the token output area (for debugging purposes)
+        symbol_table_output.delete(1.0, tk.END)
+        for var, value in semantic_analyzer.symbol_table.items():
+            symbol_table_output.insert(tk.END, f"{var}: {value}\n")
+        
+        # Display the console output (for VISIBLE statements)
+        console_output.delete(1.0, tk.END)
+        for output in semantic_analyzer.console_output:
+            console_output.insert(tk.END, f"{output}\n")
     
     except Exception as e:
         messagebox.showerror("Error", f"Failed to analyze syntax: {e}")
 
 # GUI setup
 root = tk.Tk()
-root.title("LOLCODE Syntax Checker")
+root.title("LOLCODE Syntax and Semantic Checker")
 
 frame = tk.Frame(root)
 frame.pack(fill=tk.BOTH, expand=True)
 
+# Left column (text editor)
 left_column = tk.Frame(frame, width=400, padx=10, pady=10)
 left_column.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-# Load file button
 file_button = tk.Button(left_column, text="Load File", command=loadfile)
 file_button.pack(pady=5)
 
-# Text editor for code input
 text_editor_label = tk.Label(left_column, text="Code Editor:")
 text_editor_label.pack()
 text_editor = scrolledtext.ScrolledText(left_column, wrap=tk.WORD, height=25)
 text_editor.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
 
+# Right column (output)
 right_column = tk.Frame(frame, width=400, padx=10, pady=10)
 right_column.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-# Execute button
 run_button = tk.Button(right_column, text="Execute", command=execute)
 run_button.pack(pady=5)
 
-# Output area for tokens
+# Tokens display
 token_output_label = tk.Label(right_column, text="Tokens:")
 token_output_label.pack()
-token_output = scrolledtext.ScrolledText(right_column, wrap=tk.WORD, height=25, bg="#f5f5f5")
+token_output = scrolledtext.ScrolledText(right_column, wrap=tk.WORD, height=10, bg="#f5f5f5")
 token_output.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
+
+# Symbol Table display
+symbol_table_label = tk.Label(right_column, text="Symbol Table:")
+symbol_table_label.pack()
+symbol_table_output = scrolledtext.ScrolledText(right_column, wrap=tk.WORD, height=10, bg="#f5f5f5")
+symbol_table_output.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
+
+# Console output (for VISIBLE statements)
+console_output_label = tk.Label(right_column, text="Console Output:")
+console_output_label.pack()
+console_output = scrolledtext.ScrolledText(right_column, wrap=tk.WORD, height=5, bg="#f5f5f5")
+console_output.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
 
 root.mainloop()
