@@ -83,83 +83,71 @@ class SyntaxAnalyzer:
         while self.get_current_token():
             token_type = self.get_current_token()[0]
 
+            # End of program
             if token_type == "CODE_DELIMITER" and self.get_current_token()[1] == "KTHXBYE":
                 return True  # Valid end of program
 
+            # Ignore comments
             if token_type in ["COMMENT", "MULTILINE_COMMENT_START"]:
-                self.consume()  # Ignore comments
+                self.consume()  # Skip comments
                 continue
 
-            if token_type == "OUTPUT_KEYWORD":
-                if not self.parse_output_statement():
-                    return False
-
-            elif token_type == "INPUT_KEYWORD":
-                if not self.parse_input_statement():
-                    return False
-
-            elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
-                if not self.parse_arithmetic_op():
-                    return False
-
-            elif token_type in ["BOOL_ALL_OF", "BOOL_ANY_OF"]:
-                if not self.parse_infinite_boolean_op():
-                    return False
-
-            elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
-                if not self.parse_boolean_op():
-                    return False
-
-            elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
-                if not self.parse_comparison_op():
-                    return False
-
-            elif token_type == "TYPECAST_OPERATOR":
-                if not self.parse_typecast():
-                    return False
-
-            elif token_type == "CONCAT":
-                if not self.parse_concat():
-                    return False
-
-            elif token_type == "IF_START":
-                if not self.parse_if_statement():
-                    return False
-
-            elif token_type == "LOOP_START":
-                if not self.parse_loop_statement():
-                    return False
-                
-            elif token_type == "SWITCH_START":
-                if not self.parse_switch_statement():
-                    return False
-
-            elif token_type == "FUNCTION_DEF":
+            if token_type == "FUNCTION_DEF":
                 if not self.parse_function_definition():
                     return False
 
-            elif token_type == "FUNCTION_CALL":
-                if not self.parse_function_call():
-                    return False
-
-            elif token_type == "VARIABLE_IDENTIFIER":
-
-                self.consume()  # Move to the next token
-                next_token = self.get_current_token()  # Get the next token
-                
-                if next_token[1] in ["IS NOW A"]:
-                    self.current_index -= 1  # Move back to the variable identifier
-                    if not self.parse_typecast():  # Use typecast parsing function for typecast operators
-                        return False
-                elif next_token[1] in ["R"]:
-                    self.current_index -= 1  # Move back to the variable identifier
-                    if not self.parse_assignment():
-                        return False
-            else:
-                print(f"Error: Unexpected token '{token_type}'. Skipping...")
-                self.consume()  # Skip invalid token to recover
-
+            # Delegate to parse_expressions for handling statements
+            elif not self.parse_expressions():
+                print(f"Error: Unexpected token '{token_type}' in statements.")
+                return False
         return True
+
+    def parse_expressions(self):
+        """Parse expressions."""
+        token_type = self.get_current_token()[0]
+
+        if token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
+            return self.parse_arithmetic_op()
+        elif token_type in ["BOOL_ALL_OF", "BOOL_ANY_OF"]:
+            return self.parse_infinite_boolean_op()
+        elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
+            return self.parse_boolean_op()
+        elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
+            return self.parse_comparison_op()
+        elif token_type == "CONCAT":
+            return self.parse_concat()
+        elif token_type == "OUTPUT_KEYWORD":
+            return self.parse_output_statement()
+        elif token_type == "INPUT_KEYWORD":
+            return self.parse_input_statement()
+        elif token_type == "TYPECAST_OPERATOR":
+            return self.parse_typecast()
+        elif token_type == "SWITCH_START":
+            return self.parse_switch_statement()
+        elif token_type == "IF_START":
+            return self.parse_if_statement()
+        elif token_type == "LOOP_START":
+            return self.parse_loop_statement()
+        elif token_type == "FUNCTION_CALL":
+            return self.parse_function_call()
+        elif token_type == "VARIABLE_IDENTIFIER":
+            self.consume()  # Move to the next token
+            next_token = self.get_current_token()  # Peek at the next token
+
+            if next_token and next_token[1] == "IS NOW A":
+                self.current_index -= 1  # Move back to the variable identifier
+                return self.parse_typecast()
+            elif next_token and next_token[1] == "R":
+                self.current_index -= 1  # Move back to the variable identifier
+                return self.parse_assignment()
+            else:
+                print(f"Error: Unexpected token after variable identifier '{next_token}'.")
+                return False
+
+        # Unrecognized token
+        print(f"Error: Unexpected token '{token_type}' in expressions.")
+        return False
+
 
     def parse_output_statement(self):
         """Parse VISIBLE statement."""
@@ -627,41 +615,7 @@ class SyntaxAnalyzer:
             return False
 
         return True
-
-    def parse_expressions(self):
-        '''Parse expressions.'''
-        token_type = self.get_current_token()[0]
-
-        if token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
-            return self.parse_arithmetic_op()
-        elif token_type in ["BOOL_ALL_OF", "BOOL_ANY_OF"]:
-            return self.parse_infinite_boolean_op()
-        elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
-            return self.parse_boolean_op()
-        elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
-            return self.parse_comparison_op()
-        elif token_type == "CONCAT":
-            return self.parse_concat()
-        elif token_type == "OUTPUT_KEYWORD":
-            return self.parse_output_statement()
-        elif token_type == "INPUT_KEYWORD":
-            return self.parse_input_statement()
-        elif token_type == "TYPECAST_OPERATOR":
-            return self.parse_typecast()
-        elif token_type == "SWITCH_START":
-            return self.parse_switch_statement()
-        elif token_type == "VARIABLE_IDENTIFIER":
-            return self.parse_assignment()
-        elif token_type == "IF_START":
-            return self.parse_if_statement()
-        elif token_type == "LOOP_START":
-            return self.parse_loop_statement()
-        elif token_type == "FUNCTION_CALL":
-            return self.parse_function_call()
-        else:
-            print(f"Error: Unexpected token '{token_type}' in expressions.")
-            return False
-
+    
     def parse_function_definition(self):
         """Parse function definition."""
         # Expecting 'HOW IZ I' to define a function
