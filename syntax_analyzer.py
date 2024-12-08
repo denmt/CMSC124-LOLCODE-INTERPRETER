@@ -407,33 +407,47 @@ class SyntaxAnalyzer:
         if self.match("COMPARE_EQUALS") or self.match("COMPARE_DIFF"):
             if not self.comparison_operand():
                 return False
-            if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
+
+            # Expect 'AN' operator for comparison
+            if self.match("OPERATOR_SEPARATOR"):
+                # Check for the comparison type (BIGGR OF or SMALLR OF)
+                token_type = self.get_current_token()[0]
+                if token_type == "EXPR_BIGGR":  # '>=' comparison
+                    self.match("EXPR_BIGGR")
+
+                    if not self.comparison_operand():
+                        return False
+                    if not self.match("OPERATOR_SEPARATOR"):
+                        print("Error: Expected 'AN'.")
+                        return False
+                elif token_type == "EXPR_SMALLR":  # '<=' comparison
+                    self.match("EXPR_SMALLR")
+                    if not self.comparison_operand():
+                        return False
+                    if not self.match("OPERATOR_SEPARATOR"):
+                        print("Error: Expected 'AN'.")
+                        return False
+            else:
                 print("Error: Expected 'AN'.")
                 return False
+            
+            # Parse the next comparison operand
             if not self.comparison_operand():
                 return False
         return True
-    
+
     def comparison_operand(self):
         '''Parse comparison operands.'''
         token_type = self.get_current_token()[0]
         if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "VARIABLE_IDENTIFIER"]:
             self.match(token_type)
             return True
-        elif token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
-            self.match(token_type)
-            if not self.comparison_operand():
-                return False
-            if not self.match("OPERATOR_SEPARATOR"):
-                print("Error: Expected 'AN'.")
-                return False
-            if not self.comparison_operand():
-                return False
-            
-            return True
-            
+        elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
+            return self.parse_arithmetic_op()
+
         print(f"Error: Expected valid operand, but found '{token_type}'.")
         return False
+
                   
     def parse_operand(self):
         """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""

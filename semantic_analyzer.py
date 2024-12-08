@@ -187,7 +187,12 @@ class SemanticAnalyzer:
             var_name = self.get_current_token()[1]
             self.match("VARIABLE_IDENTIFIER")
             if var_name in self.symbol_table:
-                output_parts.append(self.symbol_table[var_name])
+                value = self.symbol_table[var_name]
+                if isinstance(value, str) and '"' in value:
+                    # Remove quotes from the value
+                    value = value.replace('"', '')
+                output_parts.append(value)
+
             else:
                 print(f"Error: Variable '{var_name}' not declared.")
                 return False
@@ -596,46 +601,96 @@ class SemanticAnalyzer:
 
     def parse_comparison_op(self):
         """Parse a comparison expression."""
-        if self.match("COMPARE_EQUALS") or self.match("COMPARE_DIFF"):
-            if not self.comparison_operand():
-                return False
-            if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
-                print("Error: Expected 'AN'.")
-                return False
-            if not self.comparison_operand():
-                return False
-        return True
-    
-    def comparison_operand(self):
-        '''Parse comparison operands.'''
+        # Retrieve the comparison operator (== or !=)
+        operator = self.get_current_token()[0]
+        if not (self.match("COMPARE_EQUALS") or self.match("COMPARE_DIFF")):
+            print("Error: Expected comparison operator 'BOTH SAEM' or 'DIFFRINT'.")
+            return None
+
+        # Parse the first operand
+        operand1 = self.comparison_operand()
+        if operand1 is None:
+            print("Error: Invalid comparison operand.")
+            return None
+
+        # Ensure the presence of the 'AN' operator separator
+        if not self.match("OPERATOR_SEPARATOR"):  # Mandatory 'AN'
+            print("Error: Expected 'AN' between operands.")
+            return False
+
+        # Check for optional "BIGGR OF" or "SMALLR OF"
         token_type = self.get_current_token()[0]
-        if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "VARIABLE_IDENTIFIER"]:
-            self.match(token_type)
-            return True
-        elif token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
-            self.match(token_type)
-            if not self.comparison_operand():
-                return False
+        if token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
+            self.match(token_type)  # Consume BIGGR OF or SMALLR OF
+            comparison_operand = self.comparison_operand()  # Parse the additional operand
+            if comparison_operand is None:
+                print("Error: Invalid comparison operand after 'BIGGR OF' or 'SMALLR OF'.")
+                return None
+
+            # Update operand1 based on BIGGR or SMALLR
+            if token_type == "EXPR_BIGGR":
+                operand1 = max(operand1, comparison_operand)
+            elif token_type == "EXPR_SMALLR":
+                operand1 = min(operand1, comparison_operand)
+
+            # Match the next 'AN' separator
             if not self.match("OPERATOR_SEPARATOR"):
-                print("Error: Expected 'AN'.")
-                return False
-            if not self.comparison_operand():
-                return False
-            
-            return True
-            
-        print(f"Error: Expected valid operand, but found '{token_type}'.")
-        return False
-                  
-    def parse_operand(self):
-        """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""
-        token_type = self.get_current_token()[0]
-        if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "VARIABLE_IDENTIFIER"]:
-            self.match(token_type)
-            return True
-        print(f"Error: Expected valid operand, but found '{token_type}'.")
+                print("Error: Expected 'AN' after 'BIGGR OF' or 'SMALLR OF'.")
+                return None
+
+        # Parse the second operand
+        operand2 = self.comparison_operand()
+        if operand2 is None:
+            print("Error: Invalid second comparison operand.")
+            return None
+
+        # Perform the comparison
+        if operator == "COMPARE_EQUALS":
+            if token_type == "EXPR_BIGGR":
+                print(">=")
+                return operand1 >= operand2
+            elif token_type == "EXPR_SMALLR":
+                print("<=")
+                return operand1 <= operand2
+            else:
+                print("==")
+                return operand1 == operand2
+        elif operator == "COMPARE_DIFF":
+            if token_type == "EXPR_BIGGR":
+                print("<")
+                return operand1 < operand2
+            elif token_type == "EXPR_SMALLR":
+                print(">")
+                return operand1 > operand2
+            else:
+                print("!=")
+                return operand1 != operand2
+
+        print("Error: Unexpected comparison syntax.")
         return False
 
+    def comparison_operand(self):
+        """Parse comparison operands."""
+        token_type = self.get_current_token()
+        if token_type[0] in ["NUMBR_LITERAL", "NUMBAR_LITERAL"]:
+            value = token_type[1]  # Extract the literal value
+            self.match(token_type[0])
+            return float(value) if '.' in value else int(value)
+        elif token_type[0] == "VARIABLE_IDENTIFIER":
+            var_name = token_type[1]
+            if var_name not in self.symbol_table:
+                print(f"Error: Variable '{var_name}' not declared.")
+                return None
+            value = self.symbol_table[var_name]
+            self.match("VARIABLE_IDENTIFIER")
+            return value
+        elif token_type[0] in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
+            return self.parse_arithmetic_op()
+
+        print(f"Error: Expected valid operand, but found '{token_type[0]}'.")
+        return None
+
+    
     def parse_literal(self):
         """Parse Literals."""
         token_type = self.get_current_token()[0]
