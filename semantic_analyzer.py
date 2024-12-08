@@ -947,18 +947,21 @@ class SemanticAnalyzer:
             print("Error: Expected 'WTF?'.")
             return False
 
-        encountered_default = False
+        encountered_default = False  # Flag to track if the default block is used
 
         while self.get_current_token():
             token_type = self.get_current_token()[0]
 
-            # Parse each case or default block using switch_case
-            if token_type in ["SWITCH_CASE", "SWITCH_DEFAULT"]:
-                if token_type == "SWITCH_DEFAULT":
-                    if encountered_default:
-                        print("Error: Multiple 'OMGWTF' blocks are not allowed.")
-                        return False
-                    encountered_default = True
+            # Handle SWITCH_CASE or SWITCH_DEFAULT
+            if token_type == "SWITCH_CASE":
+                if not self.switch_case():
+                    return False
+
+            elif token_type == "SWITCH_DEFAULT":
+                if encountered_default:
+                    print("Error: Multiple 'OMGWTF' blocks are not allowed.")
+                    return False
+                encountered_default = True
 
                 if not self.switch_case():
                     return False
@@ -968,6 +971,7 @@ class SemanticAnalyzer:
                 self.match("CONDITIONAL_END")
                 return True
 
+            # Handle unexpected tokens
             else:
                 print(f"Error: Unexpected token '{token_type}' in switch statement.")
                 return False
@@ -980,42 +984,72 @@ class SemanticAnalyzer:
         """Parse a single case or default block."""
         token_type = self.get_current_token()[0]
 
-        # Handle case blocks
+        # Handle SWITCH_CASE block
         if token_type == "SWITCH_CASE":
             self.match("SWITCH_CASE")  # Consume 'OMG'
+            
+            # Get the case value after 'OMG'
+            case_value = self.get_current_token()[1]
             if not self.match("NUMBR_LITERAL"):
                 print("Error: Expected a number literal for case block.")
                 return False
+            
+            print(f"Parsing case for value: {case_value}")
 
-            # Parse the statements within the case
+            # Get the value of IT variable
+            it_value = self.symbol_table.get("IT", None)
+            if it_value is None:
+                print("Error: 'IT' variable not found in case evaluation.")
+                return False
+
+            # Check if IT is valid and matches with the case value
+            if str(it_value) != str(case_value):
+                # If IT doesn't match the case value, skip this case and continue
+                print(f"IT value '{it_value}' does not match case value '{case_value}'. Skipping case.")
+                
+                # Skip all the statements in this case block, including VISIBLE
+                while self.get_current_token():
+                    next_token = self.get_current_token()[0]
+                    if next_token in ["SWITCH_CASE", "SWITCH_DEFAULT", "CONDITIONAL_END"]:
+                        break
+                    self.consume()  # Skip tokens within the case block
+                
+                return True  # Proceed to next case or block
+
+            # Parse statements within the case block
             while self.get_current_token():
                 exp_token = self.get_current_token()[0]
-                if exp_token in ["SWITCH_CASE", "SWITCH_DEFAULT"]:
+                if exp_token in ["SWITCH_CASE", "SWITCH_DEFAULT"]:  # Break to outer block
                     break
-                elif exp_token == "BREAK":  # Break out of the current case
+                elif exp_token == "BREAK":  # Handle break in the case block
                     self.match("BREAK")
                     break
-                if not self.parse_expressions():
+                if not self.parse_expressions():  # Handle expressions inside the case
                     return False
 
-        # Handle the default block
+        # Handle SWITCH_DEFAULT block
         elif token_type == "SWITCH_DEFAULT":
             self.match("SWITCH_DEFAULT")
 
-            # Parse the statements within the default case
+            # Parse statements within the default block
             while self.get_current_token():
                 next_token = self.get_current_token()[0]
-                if next_token == "CONDITIONAL_END":  # End of the switch-case
+                if next_token == "CONDITIONAL_END":  # End of switch block
                     return True
-                if not self.parse_expressions():
+                if not self.parse_expressions():  # Handle expressions inside the default block
                     return False
-                
-        # Handle unexpected cases
+
+        # Handle unexpected tokens
         else:
             print(f"Error: Unexpected token '{token_type}' in switch-case.")
             return False
 
         return True
+
+
+
+
+        
     def parse_function_definition(self):
         """Parse function definition."""
         # Expecting 'HOW IZ I' to define a function
