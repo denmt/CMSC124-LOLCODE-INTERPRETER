@@ -98,20 +98,28 @@ class SyntaxAnalyzer:
                 if not self.parse_input_statement():
                     return False
 
-            elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT"]:
+            elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
                 if not self.parse_arithmetic_op():
                     return False
-                
+
             elif token_type in ["BOOL_ALL_OF", "BOOL_ANY_OF"]:
                 if not self.parse_infinite_boolean_op():
                     return False
-            
-            elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT", "BOOL_ALL_OF", "BOOL_ANY_OF"]:
+
+            elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
                 if not self.parse_boolean_op():
                     return False
-                
+
             elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
                 if not self.parse_comparison_op():
+                    return False
+
+            elif token_type == "TYPECAST_OPERATOR":
+                if not self.parse_typecast():
+                    return False
+
+            elif token_type == "CONCAT":
+                if not self.parse_concat():
                     return False
 
             elif token_type == "IF_START":
@@ -125,47 +133,71 @@ class SyntaxAnalyzer:
             elif token_type == "FUNCTION_DEF":
                 if not self.parse_function_definition():
                     return False
-            
+
             elif token_type == "FUNCTION_CALL":
                 if not self.parse_function_call():
                     return False
-            
-            elif token_type == "VARIABLE_IDENTIFIER":
-                if not self.parse_assignment():
-                    return False
 
+            elif token_type == "VARIABLE_IDENTIFIER":
+
+                self.consume()  # Move to the next token
+                next_token = self.get_current_token()  # Get the next token
+                
+                if next_token[1] in ["IS NOW A"]:
+                    self.current_index -= 1  # Move back to the variable identifier
+                    if not self.parse_typecast():  # Use typecast parsing function for typecast operators
+                        return False
+                elif next_token[1] in ["R"]:
+                    self.current_index -= 1  # Move back to the variable identifier
+                    if not self.parse_assignment():
+                        return False
             else:
-                print(f"Error: Unexpected token '{token_type}'.")
-                return False
+                print(f"Error: Unexpected token '{token_type}'. Skipping...")
+                self.consume()  # Skip invalid token to recover
 
         return True
 
     def parse_output_statement(self):
         """Parse VISIBLE statement."""
-        if not self.match("OUTPUT_KEYWORD"):
+        if not self.match("OUTPUT_KEYWORD"):  # Ensure it starts with VISIBLE
             print("Error: Expected 'VISIBLE'.")
             return False
-        
-        token_type = self.get_current_token()[0]
-        if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
-            self.parse_literal() 
-        elif token_type == "VARIABLE_IDENTIFIER":
-            self.match("VARIABLE_IDENTIFIER")
-        elif not self.parse_statements():
+
+        if not self.parse_print_argument():  # Parse the first argument
             print("Error: Invalid print argument.")
             return False
-        
-        while self.match("PRINT_CAT"):
-            token_type = self.get_current_token()[0]
-            if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
-                self.parse_literal()
-            elif token_type == "VARIABLE_IDENTIFIER":
-                self.match("VARIABLE_IDENTIFIER")
-            else:
-                if not self.parse_statements():
-                    print("Error: Invalid print argument.")
-                    return False
+
+        while self.match("PRINT_CAT") or self.match("OPERATOR_SEPARATOR"):  # Handle concatenations
+            if not self.parse_print_argument():
+                print("Error: Invalid print argument in concatenation.")
+                return False
+
         return True
+
+    def parse_print_argument(self):
+        """Parse individual arguments in a VISIBLE statement."""
+        token_type = self.get_current_token()[0]
+
+        if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
+            self.parse_literal()  # Parse literal values
+            return True
+        elif token_type == "VARIABLE_IDENTIFIER":
+            self.match("VARIABLE_IDENTIFIER")  # Parse variable identifiers
+            return True
+        elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
+            return self.parse_arithmetic_op()  # Parse nested arithmetic operations
+        elif token_type in ["BOOL_ALL_OF", "BOOL_ANY_OF", "BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
+            return self.parse_boolean_op()  # Handle boolean operations if needed'
+        elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
+            return self.parse_comparison_op()
+        elif token_type == "CONCAT":
+            return self.parse_concat()
+        elif token_type == "FUNCTION_CALL":
+            return self.parse_function_call()
+        else:
+            print(f"Error: Unexpected token '{token_type}' in print argument.")
+            return False
+
     
     def parse_input_statement(self):
         """Parse GIMMEH statement."""
@@ -182,36 +214,126 @@ class SyntaxAnalyzer:
         if not self.match("VARIABLE_IDENTIFIER"):
             print("Error: Expected a variable identifier.")
             return False
-        if not self.match("ASSIGNMENT"):  # Expecting 'R'
+
+        if not self.match("ASSIGNMENT"):  
             print("Error: Expected 'R'.")
-            return False
-        
+            return False        
+
         token_type = self.get_current_token()[0]
+
         if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
-            self.parse_literal()
+            if not self.parse_literal():
+                print("Error: Invalid literal in assignment.")
+                return False
+        elif token_type in ["TYPECAST_OPERATOR"]:
+            if not self.match("TYPECAST_OPERATOR"):  # Consume "MAEK"
+                return False
+            if not self.match("VARIABLE_IDENTIFIER"):
+                print("Error: Expected a variable identifier after 'MAEK'.")
+                return False
+            if not self.match("TYPE_LITERAL"):
+                print("Error: Expected a valid type literal to typecast.")
+                return False
+            
         elif token_type == "VARIABLE_IDENTIFIER":
-            self.match("VARIABLE_IDENTIFIER")
+            if not self.match("VARIABLE_IDENTIFIER"):
+                print("Error: Expected a valid variable identifier. NGI")
+                return False
+        elif token_type == "CONCAT":
+            if not self.parse_concat():
+                return False
         else:
             if not self.parse_statements():
                 print("Error: Invalid assignment value.")
                 return False
+
+        return True
+    
+    def parse_typecast(self):
+        """Parse typecast operation."""
+        # Check for variable identifier
+        if not self.match("VARIABLE_IDENTIFIER"):
+            print("Error: Expected a variable identifier.")
+            return False
+
+        # Check for typecast operators (e.g., "IS NOW A" or "MAEK")
+        if self.get_current_token()[1] == "IS NOW A":
+            self.match("TYPECAST_OPERATOR")  # Consume "IS NOW A"
+            if not self.match("TYPE_LITERAL"):
+                print("Error: Expected a valid type literal.")
+                return False
+        elif self.get_current_token()[1] == "MAEK":
+            self.match("TYPECAST_OPERATOR")  # Consume "MAEK"
+            if not self.match("VARIABLE_IDENTIFIER"):
+                print("Error: Expected a variable identifier after 'MAEK'.")
+                return False
+
+            # Handle type assignment or direct type literals
+            token_type = self.get_current_token()[0]
+            if token_type == "TYPE_ASSIGNMENT":
+                self.match("TYPE_ASSIGNMENT")  # Consume "ITZ A"
+                if not self.match("TYPE_LITERAL"):
+                    print("Error: Expected a valid type literal after 'ITZ A'.")
+                    return False
+            elif token_type == "TYPE_LITERAL":
+                self.match("TYPE_LITERAL")
+            else:
+                print("Error: Expected a valid type literal or type assignment.")
+                return False
+        else:
+            print("Error: Expected 'IS NOW A' or 'MAEK' as typecast operator.")
+            return False
+
+        return True
+
+    def parse_concat(self):
+        """Parse string concatenation."""
+        if not self.match("CONCAT"):
+            return False
+
+        while True:
+            token_type = self.get_current_token()[0]
+            if token_type in ["YARN_LITERAL", "VARIABLE_IDENTIFIER"]:
+                self.match(token_type)
+            elif token_type == "CONCAT":
+                if not self.parse_concat():
+                    return False
+            else:
+                print("Error: Invalid concatenation value.")
+                return False
+
+            if not self.match("OPERATOR_SEPARATOR"):
+                break  # End of concatenation chain
+
         return True
 
     def parse_arithmetic_op(self):
-        """Parse a basic expression like NUMBR, SUM OF, etc."""
-        if self.match("EXPR_SUM") or self.match("EXPR_DIFF") or self.match("EXPR_PRODUKT") or self.match("EXPR_QUOSHUNT"):
-            if not self.parse_operand():
+        """Parse arithmetic operation."""
+
+        if self.match("EXPR_SUM") or self.match("EXPR_DIFF") or self.match("EXPR_PRODUKT") or self.match("EXPR_QUOSHUNT") or self.match("EXPR_MOD") or self.match("EXPR_BIGGR") or self.match("EXPR_SMALLR"):
+            if not self.parse_arith_operand():
                 return False
             if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
                 print("Error: Expected 'AN'.")
                 return False
-            if not self.parse_operand():
+            if not self.parse_arith_operand():
                 return False
-
         else:
             return False
         return True
     
+    def parse_arith_operand(self):
+        """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""
+        token_type = self.get_current_token()[0]
+        if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL", "YARN_LITERAL", "VARIABLE_IDENTIFIER"]:
+            self.match(token_type)
+            return True
+        elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
+            return self.parse_arithmetic_op()
+        
+        print(f"Error: Expected valid operand, but found '{token_type}'.")
+        return False
+        
     def parse_infinite_boolean_op(self):
         """Parse infinite boolean expressions like ALL OF or ANY OF."""
         if not (self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF")):
@@ -313,6 +435,7 @@ class SyntaxAnalyzer:
             return True
         print(f"Error: Expected valid operand, but found '{token_type}'.")
         return False
+
 
     def parse_literal(self):
         """Parse Literals."""
