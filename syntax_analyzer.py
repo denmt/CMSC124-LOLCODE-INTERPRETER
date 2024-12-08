@@ -191,7 +191,6 @@ class SyntaxAnalyzer:
             print(f"Error: Unexpected token '{token_type}' in print argument.")
             return False
 
-    
     def parse_input_statement(self):
         """Parse GIMMEH statement."""
         if not self.match("INPUT_KEYWORD"):
@@ -447,18 +446,7 @@ class SyntaxAnalyzer:
 
         print(f"Error: Expected valid operand, but found '{token_type}'.")
         return False
-
-                  
-    def parse_operand(self):
-        """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""
-        token_type = self.get_current_token()[0]
-        if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "VARIABLE_IDENTIFIER"]:
-            self.match(token_type)
-            return True
-        print(f"Error: Expected valid operand, but found '{token_type}'.")
-        return False
-
-
+    
     def parse_literal(self):
         """Parse Literals."""
         token_type = self.get_current_token()[0]
