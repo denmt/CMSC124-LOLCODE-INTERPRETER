@@ -67,24 +67,15 @@ class SyntaxAnalyzer:
                 return False
 
             if self.match("VARIABLE_ASSIGNMENT"):  # Expecting 'ITZ'
-                if not self.parse_literal():
-                    print("Error: Invalid variable initialization.")
-                elif not self.parse_arithmetic_op():
-                    print("Error: Invalid variable initialization.")
-                elif not self.parse_boolean_op():
-                    print("Error: Invalid variable initialization.")
-                elif not self.parse_comparison_op():
-                    print("Error: Invalid variable initialization.")
-                    return False
-                elif not self.parse_function_call():
-                    print("Error: Invalid variable initialization.")
-                    return False
-                elif not self.parse_concat():
-                    print("Error: Invalid variable initialization.")
-                    return False
+                token_type = self.get_current_token()[0]
+                if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
+                    self.match(token_type)  # Consume the literal value
+                elif token_type == "VARIABLE_IDENTIFIER":
+                    self.match("VARIABLE_IDENTIFIER")
                 else:
-                    print("Error: Invalid variable initialization.")
-                    return False
+                    if not self.parse_expressions():
+                        print("Error: Invalid variable assignment.")
+                        return False
         return True
 
     def parse_statements(self):
