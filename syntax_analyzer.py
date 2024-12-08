@@ -408,24 +408,35 @@ class SyntaxAnalyzer:
     def parse_comparison_op(self):
         """Parse a comparison expression."""
         if self.match("COMPARE_EQUALS") or self.match("COMPARE_DIFF"):
-            if not self.parse_operand():
+            if not self.comparison_operand():
                 return False
             if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
                 print("Error: Expected 'AN'.")
                 return False
- 
-            token_type = self.get_current_token()[0]
-            if token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
-                self.match(token_type)
-                if not self.parse_operand():
-                    return False
-                if not self.match("OPERATOR_SEPARATOR"):
-                    print("Error: Expected 'AN'.")
-                    return False
-                                
-            if not self.parse_operand():
+            if not self.comparison_operand():
                 return False
         return True
+    
+    def comparison_operand(self):
+        '''Parse comparison operands.'''
+        token_type = self.get_current_token()[0]
+        if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "VARIABLE_IDENTIFIER"]:
+            self.match(token_type)
+            return True
+        elif token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
+            self.match(token_type)
+            if not self.comparison_operand():
+                return False
+            if not self.match("OPERATOR_SEPARATOR"):
+                print("Error: Expected 'AN'.")
+                return False
+            if not self.comparison_operand():
+                return False
+            
+            return True
+            
+        print(f"Error: Expected valid operand, but found '{token_type}'.")
+        return False
                   
     def parse_operand(self):
         """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""
@@ -508,7 +519,9 @@ class SyntaxAnalyzer:
         
         while self.get_current_token():
             if self.match("LOOP_END"):
-                return True
+                if not self.match("LOOP_IDENTIFIER"):
+                    print("Error: Expected loop label.")
+                    return False
             
             if not self.parse_expressions():
                 return False
