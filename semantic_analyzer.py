@@ -319,6 +319,43 @@ class SemanticAnalyzer:
             print(f"Error: Expected arithmetic operator, but found '{operator}'.")
             return None
 
+    def parse_typecast(self):
+        """Parse typecast operation."""
+        # Check for variable identifier
+        if not self.match("VARIABLE_IDENTIFIER"):
+            print("Error: Expected a variable identifier.")
+            return False
+
+        # Check for typecast operators (e.g., "IS NOW A" or "MAEK")
+        if self.get_current_token()[1] == "IS NOW A":
+            self.match("TYPECAST_OPERATOR")  # Consume "IS NOW A"
+            if not self.match("TYPE_LITERAL"):
+                print("Error: Expected a valid type literal.")
+                return False
+        elif self.get_current_token()[1] == "MAEK":
+            self.match("TYPECAST_OPERATOR")  # Consume "MAEK"
+            if not self.match("VARIABLE_IDENTIFIER"):
+                print("Error: Expected a variable identifier after 'MAEK'.")
+                return False
+
+            # Handle type assignment or direct type literals
+            token_type = self.get_current_token()[0]
+            if token_type == "TYPE_ASSIGNMENT":
+                self.match("TYPE_ASSIGNMENT")  # Consume "ITZ A"
+                if not self.match("TYPE_LITERAL"):
+                    print("Error: Expected a valid type literal after 'ITZ A'.")
+                    return False
+            elif token_type == "TYPE_LITERAL":
+                self.match("TYPE_LITERAL")
+            else:
+                print("Error: Expected a valid type literal or type assignment.")
+                return False
+        else:
+            print("Error: Expected 'IS NOW A' or 'MAEK' as typecast operator.")
+            return False
+
+        return True
+    
     def parse_arith_operand(self):
         """Parse and return the value of operands in an arithmetic expression."""
         token_type = self.get_current_token()[0]
@@ -392,49 +429,131 @@ class SemanticAnalyzer:
         # If none of the above match, raise an error
         print(f"Error: Expected valid numeric operand, but found '{token_type}'.")
         return None
+    
+    def parse_concat(self):
+        """Parse string concatenation."""
+        if not self.match("CONCAT"):
+            return False
 
+        while True:
+            token_type = self.get_current_token()[0]
+            if token_type in ["YARN_LITERAL", "VARIABLE_IDENTIFIER"]:
+                self.match(token_type)
+            elif token_type == "CONCAT":
+                if not self.parse_concat():
+                    return False
+            else:
+                print("Error: Invalid concatenation value.")
+                return False
+
+            if not self.match("OPERATOR_SEPARATOR"):
+                break  # End of concatenation chain
+
+        return True
+
+    def parse_infinite_boolean_op(self):
+        """Parse infinite boolean expressions like ALL OF or ANY OF."""
+        if not (self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF")):
+            return False  # Must start with ALL OF or ANY OF
+
+        has_operand = False  # Track if we have at least one operand
+
+        while self.get_current_token():
+            token_type = self.get_current_token()[0]
+
+            if token_type == "CLOSING_KEYWORD":  # End of the boolean operation
+                self.match("CLOSING_KEYWORD")
+                if not has_operand:
+                    print("Error: Expected at least one operand before 'MKAY'.")
+                    return False
+                return True
+
+            elif token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL", "VARIABLE_IDENTIFIER"]:  # Parse operands
+                self.match(token_type)
+                has_operand = True
+
+            elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
+                if not self.parse_boolean_op():
+                    return False
+                has_operand = True
+
+            elif token_type == "OPERATOR_SEPARATOR":  # 'AN' as a separator
+                if not has_operand:
+                    print("Error: Unexpected 'AN' without a preceding operand.")
+                    return False
+                self.match("OPERATOR_SEPARATOR")  # Consume the 'AN'
+
+            else:
+                print(f"Error: Unexpected token '{token_type}'.")
+                return False
+
+        # If the loop exits without finding CLOSING_KEYWORD
+        print("Error: Expected 'MKAY' to close the boolean expression.")
+        return False
+          
     def parse_boolean_op(self):
-        '''Parse boolean operations'''
-        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR") or self.match("BOOL_NOT"):
-            if not self.parse_operand():
+        """Parse boolean expressions."""
+        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR"):
+            if not self.parse_boolean_operand():
+                print("Error: Expected boolean operand.")
                 return False
             if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
                 print("Error: Expected 'AN'.")
                 return False
-            if not self.parse_operand():
+            if not self.parse_boolean_operand():
                 return False
-        elif self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF"):
-            while self.match("CLOSING_KEYWORD"):
-                if not self.parse_operand():
-                    return False
-                if not self.match("OPERATOR_SEPARATOR"):
-                    print("Error: Expected 'AN'.")
-                    return False
-                if not self.parse_operand():
-                    return False
-                
-                
+        elif self.match("BOOL_NOT"):
+            if not self.parse_boolean_operand():
+                return False
+            
+        return True
+    
+    def parse_boolean_operand(self):
+        """Parse boolean operands."""
+        token_type = self.get_current_token()[0]  # Get current token type
+        if token_type in ["NUMBR_LITERAL","NUMBAR_LITERAL","TROOF_LITERAL", "VARIABLE_IDENTIFIER"]:
+            self.match(token_type)  # Consume the operand
+            return True
+        elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR"]:
+            return self.parse_boolean_op()  # Parse nested boolean op
+        elif token_type == "BOOL_NOT":
+            return self.parse_boolean_op()  # Parse NOT operation
+        
+        print("Error: Expected boolean operand.")
+        return False
 
     def parse_comparison_op(self):
         """Parse a comparison expression."""
         if self.match("COMPARE_EQUALS") or self.match("COMPARE_DIFF"):
-            if not self.parse_operand():
+            if not self.comparison_operand():
                 return False
             if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
                 print("Error: Expected 'AN'.")
                 return False
- 
-            token_type = self.get_current_token()[0]
-            if token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
-                self.match(token_type)
-                if not self.parse_operand():
-                    return False
-                if not self.match("OPERATOR_SEPARATOR"):
-                    print("Error: Expected 'AN'.")
-                    return False
-                                
-            if not self.parse_operand():
+            if not self.comparison_operand():
                 return False
+        return True
+    
+    def comparison_operand(self):
+        '''Parse comparison operands.'''
+        token_type = self.get_current_token()[0]
+        if token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "VARIABLE_IDENTIFIER"]:
+            self.match(token_type)
+            return True
+        elif token_type in ["EXPR_BIGGR", "EXPR_SMALLR"]:
+            self.match(token_type)
+            if not self.comparison_operand():
+                return False
+            if not self.match("OPERATOR_SEPARATOR"):
+                print("Error: Expected 'AN'.")
+                return False
+            if not self.comparison_operand():
+                return False
+            
+            return True
+            
+        print(f"Error: Expected valid operand, but found '{token_type}'.")
+        return False
                   
     def parse_operand(self):
         """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""
@@ -453,54 +572,184 @@ class SemanticAnalyzer:
             value = int(value)  # Convert to integer
         elif token_type == "NUMBAR_LITERAL":
             value = float(value)  # Convert to float
-        elif token_type in ["YARN_LITERAL", "TROOF_LITERAL"]:
-            value = value  # Strings and TROOF literals can stay as is
+        elif token_type in ["YARN_LITERAL"]:
+            value = value[1:-1]  # Remove the quotes from the string
+        elif token_type == "TROOF_LITERAL":
+            if value == "WIN":
+                value = True
+            else:
+                value = False
         else:
             print(f"Error: Expected literal, but found '{token_type}'.")
             return None
         self.match(token_type)
         return value
-
+    
     def parse_if_statement(self):
-        """Parse IF-THEN statement."""
+        """Parse if statement."""
         if not self.match("IF_START"):
+            print("Error: Expected 'O RLY?'.")
             return False
-        if not self.match("IF_YES"):  # YA RLY
+
+        # Handle the "YA RLY" block
+        if not self.match("IF_YES"):
             print("Error: Expected 'YA RLY'.")
             return False
-        if not self.parse_statements():  # Handle if body
-            return False
-        if not self.match("IF_NO"):  # NO WAI
+
+        # Parse the statements under "YA RLY"
+        while self.get_current_token():
+            if self.match("CONDITIONAL_END"):
+                return True  # End of the IF block
+            if self.get_current_token()[0] == "IF_NO":
+                break  # Transition to "NO WAI"
+            if not self.parse_expressions():
+                return False
+
+        # Handle the "NO WAI" block if present
+        if not self.match("IF_NO"):
             print("Error: Expected 'NO WAI'.")
             return False
-        if not self.parse_statements():  # Handle else body
-            return False
-        if not self.match("CONDITIONAL_END"):  # OIC
-            print("Error: Expected 'OIC'.")
-            return False
-        return True
+
+        # Parse the statements under "NO WAI"
+        while self.get_current_token():
+            if self.match("CONDITIONAL_END"):
+                return True  # End of the IF block
+            if not self.parse_expressions():
+                return False
+
+        print("Error: Expected 'OIC' to close the if statement.")
+        return False
 
     def parse_loop_statement(self):
         """Parse loop statement."""
-        if not self.match("LOOP_START"):
+        # Match the start of the loop
+        if not self.match("LOOP_START"):  # 'IM IN YR'
             print("Error: Expected 'IM IN YR'.")
             return False
-        if not self.match("LOOP_OPERATION"):  # UPPIN or NERFIN
+
+        # Match the loop label
+        if not self.match("LOOP_IDENTIFIER"):  # e.g., 'asc' or 'desc'
+            print("Error: Expected loop label after 'IM IN YR'.")
+            return False
+
+        # Match the operation (UPPIN or NERFIN)
+        if not self.match("LOOP_OPERATION"):  # 'UPPIN' or 'NERFIN'
             print("Error: Expected 'UPPIN' or 'NERFIN'.")
             return False
-        if not self.match("VARIABLE_IDENTIFIER"):  # Loop variable
-            print("Error: Expected loop variable.")
+
+        # Match the delimiter
+        if not self.match("DELIMITER"):  # 'YR'
+            print("Error: Expected 'YR' after 'UPPIN' or 'NERFIN'.")
             return False
-        if not self.match("LOOP_CONDITION"):  # TIL or WILE
+
+        # Match the loop variable
+        if not self.match("VARIABLE_IDENTIFIER"):  # Loop variable
+            print("Error: Expected a variable after 'YR'.")
+            return False
+
+        # Match the loop condition (TIL or WILE)
+        if not self.match("LOOP_CONDITION"):  # 'TIL' or 'WILE'
             print("Error: Expected 'TIL' or 'WILE'.")
             return False
-        if not self.parse_arithmetic_op():  # Loop condition
-            return False
-        if not self.match("LOOP_END"):  # IM OUTTA YR
-            print("Error: Expected 'IM OUTTA YR'.")
-            return False
-        return True
 
+        # Parse the loop condition expression
+        if not self.parse_expressions():  # Expression after 'TIL' or 'WILE'
+            print("Error: Failed to parse loop condition expression.")
+            return False
+
+        # Parse the body of the loop
+        while self.get_current_token():
+            # End of the loop block
+            if self.match("LOOP_END"):  # 'IM OUTTA YR'
+                if self.match("LOOP_IDENTIFIER"):  # Match the loop label
+                    return True
+                else:
+                    print("Error: Expected loop label after 'IM OUTTA YR'.")
+                    return False
+
+            # Parse loop body expressions
+            if not self.parse_expressions():
+                return False
+
+        # If we exit the loop without finding 'IM OUTTA YR'
+        print("Error: Expected 'IM OUTTA YR' to end the loop.")
+        return False
+
+    def parse_switch_statement(self):
+        """Parse a switch-case statement."""
+        if not self.match("SWITCH_START"):
+            print("Error: Expected 'WTF?'.")
+            return False
+
+        encountered_default = False
+
+        while self.get_current_token():
+            token_type = self.get_current_token()[0]
+
+            # Parse each case or default block using switch_case
+            if token_type in ["SWITCH_CASE", "SWITCH_DEFAULT"]:
+                if token_type == "SWITCH_DEFAULT":
+                    if encountered_default:
+                        print("Error: Multiple 'OMGWTF' blocks are not allowed.")
+                        return False
+                    encountered_default = True
+
+                if not self.switch_case():
+                    return False
+
+            # Handle the end of the switch statement
+            elif token_type == "CONDITIONAL_END":
+                self.match("CONDITIONAL_END")
+                return True
+
+            else:
+                print(f"Error: Unexpected token '{token_type}' in switch statement.")
+                return False
+
+        print("Error: Expected 'OIC' to close the switch statement.")
+        return False
+
+
+    def switch_case(self):
+        """Parse a single case or default block."""
+        token_type = self.get_current_token()[0]
+
+        # Handle case blocks
+        if token_type == "SWITCH_CASE":
+            self.match("SWITCH_CASE")  # Consume 'OMG'
+            if not self.match("NUMBR_LITERAL"):
+                print("Error: Expected a number literal for case block.")
+                return False
+
+            # Parse the statements within the case
+            while self.get_current_token():
+                exp_token = self.get_current_token()[0]
+                if exp_token in ["SWITCH_CASE", "SWITCH_DEFAULT"]:
+                    break
+                elif exp_token == "BREAK":  # Break out of the current case
+                    self.match("BREAK")
+                    break
+                if not self.parse_expressions():
+                    return False
+
+        # Handle the default block
+        elif token_type == "SWITCH_DEFAULT":
+            self.match("SWITCH_DEFAULT")
+
+            # Parse the statements within the default case
+            while self.get_current_token():
+                next_token = self.get_current_token()[0]
+                if next_token == "CONDITIONAL_END":  # End of the switch-case
+                    return True
+                if not self.parse_expressions():
+                    return False
+                
+        # Handle unexpected cases
+        else:
+            print(f"Error: Unexpected token '{token_type}' in switch-case.")
+            return False
+
+        return True
     def parse_function_definition(self):
         """Parse function definition."""
         # Expecting 'HOW IZ I' to define a function
@@ -540,39 +789,13 @@ class SemanticAnalyzer:
                 if not self.parse_return():
                     return False
 
-            # Handle output statements
-            elif token_type == "OUTPUT_KEYWORD":
-                if not self.parse_output_statement():
-                    return False
-
-            # Handle input statements
-            elif token_type == "INPUT_KEYWORD":
-                if not self.parse_input_statement():
-                    return False
-
-            # Handle expressions
-            elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT"]:
-                if not self.parse_arithmetic_op():
-                    return False
-
-            # Handle IF statements
-            elif token_type == "IF_START":
-                if not self.parse_if_statement():
-                    return False
-
-            # Handle loops
-            elif token_type == "LOOP_START":
-                if not self.parse_loop_statement():
-                    return False
-
-            # Handle function calls
-            elif token_type == "FUNCTION_CALL":
-                if not self.parse_function_call():
-                    return False
-
             # Handle breaks
             elif token_type == "BREAK":
                 self.match("BREAK")
+
+            # Parse expressions within the function body
+            elif not self.parse_expressions():
+                return False
 
             # Handle unexpected tokens to avoid errors
             else:
@@ -626,4 +849,3 @@ class SemanticAnalyzer:
         else:
             print("Error: Invalind return value.\n")
             return False
-        
