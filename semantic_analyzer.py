@@ -111,6 +111,10 @@ class SemanticAnalyzer:
             return self.parse_boolean_op()
         elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
             return self.parse_comparison_op()
+        elif token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "YARN_LITERAL", "TROOF_LITERAL"]:
+            return self.parse_literal()
+        if token_type == "CLOSING_KEYWORD": 
+            return self.match("CLOSING_KEYWORD")
         elif token_type == "CONCAT":
             return self.parse_concat()
         elif token_type == "OUTPUT_KEYWORD":
@@ -525,35 +529,71 @@ class SemanticAnalyzer:
 
     def parse_infinite_boolean_op(self):
         """Parse infinite boolean expressions like ALL OF or ANY OF."""
-        if not (self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF")):
+        
+        # Check for ANY OF or ALL OF
+        token_type = self.get_current_token()[0]
+        if not (token_type == "BOOL_ALL_OF" or token_type == "BOOL_ANY_OF"):
             return False  # Must start with ALL OF or ANY OF
-
+        
+        # Match the initial token for ALL OF or ANY OF
+        self.match(token_type)
+        
         has_operand = False  # Track if we have at least one operand
+        result = None  # To store the final result of the operation
+
+        print(f"Parsing an infinite boolean expression: {token_type}...")
 
         while self.get_current_token():
             token_type = self.get_current_token()[0]
+            
+            # Debug print to see the current token
+            print(f"Current token: {token_type}")
 
             if token_type == "CLOSING_KEYWORD":  # End of the boolean operation
-                self.match("CLOSING_KEYWORD")
+                self.match("CLOSING_KEYWORD")  # Consume 'MKAY'
                 if not has_operand:
                     print("Error: Expected at least one operand before 'MKAY'.")
                     return False
-                return True
+                print(f"Final result: {result}")
+                return result
 
-            elif token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL", "VARIABLE_IDENTIFIER"]:  # Parse operands
-                self.match(token_type)
+            elif token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL", "VARIABLE_IDENTIFIER"]:
+                # Consume literals or variable identifiers as operands
+                operand = self.parse_boolean_operand()
+                if operand is None:
+                    return False
                 has_operand = True
+                # If it's the first operand, set it as the initial result
+                if result is None:
+                    result = operand
+                else:
+                    # Apply the boolean operation based on the type of "ALL OF" or "ANY OF"
+                    if token_type == "BOOL_ALL_OF":
+                        result = result and operand  # AND operation for ALL OF
+                        print(f"Applying AND (ALL OF) with operand: {operand}, result now: {result}")
+                    elif token_type == "BOOL_ANY_OF":
+                        result = result or operand  # OR operation for ANY OF
+                        print(f"Applying OR (ANY OF) with operand: {operand}, result now: {result}")
 
             elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
+                # Handle logical operators that are applied between operands
                 if not self.parse_boolean_op():
                     return False
                 has_operand = True
 
-            elif token_type == "OPERATOR_SEPARATOR":  # 'AN' as a separator
+            elif token_type == "OPERATOR_SEPARATOR":  # Handle 'AN'
                 if not has_operand:
                     print("Error: Unexpected 'AN' without a preceding operand.")
                     return False
                 self.match("OPERATOR_SEPARATOR")  # Consume the 'AN'
+                print("Found 'AN', looking for next operand...")
+
+            elif token_type == "BOOL_BOTH_OF" or token_type == "BOOL_EITHER_OF":
+                # Recursively parse nested operations like "BOTH OF" and "EITHER OF"
+                # Ensure recursion is correctly managed and doesn't loop endlessly
+                if not self.parse_infinite_boolean_op():
+                    return False
+                has_operand = True
 
             else:
                 print(f"Error: Unexpected token '{token_type}'.")
@@ -562,23 +602,53 @@ class SemanticAnalyzer:
         # If the loop exits without finding CLOSING_KEYWORD
         print("Error: Expected 'MKAY' to close the boolean expression.")
         return False
+
+
+
+
           
     def parse_boolean_op(self):
-        """Parse boolean expressions."""
-        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR"):
-            if not self.parse_boolean_operand():
-                print("Error: Expected boolean operand.")
-                return False
-            if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
-                print("Error: Expected 'AN'.")
-                return False
-            if not self.parse_boolean_operand():
-                return False
-        elif self.match("BOOL_NOT"):
-            if not self.parse_boolean_operand():
-                return False
+        """Parse and evaluate boolean operations like AND, OR, XOR, and NOT."""
+        token_type = self.get_current_token()[0]
+        
+        # Check for boolean operators: AND, OR, XOR, NOT
+        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR") or self.match("BOOL_NOT"):
             
-        return True
+            # Handle 'NOT' operator, which only requires one operand
+            if token_type == "BOOL_NOT":
+                operand1 = self.parse_expressions()
+                if operand1 is None:
+                    return None
+                return not bool(operand1)  # Negate the operand
+
+            # For AND, OR, XOR, we need two operands
+            operand1 = self.parse_expressions()
+            if operand1 is None:
+                return None
+            
+            # Expect the operator separator 'AN'
+            if not self.match("OPERATOR_SEPARATOR"):
+                print("Error: Expected 'AN'.")
+                return None
+            
+            operand2 = self.parse_expressions()
+            if operand2 is None:
+                return None
+
+            operand1 = bool(operand1)
+            operand2 = bool(operand2)
+            # Perform the logical operation based on the operator
+            if token_type == "BOOL_AND":
+                return operand1 and operand2
+            elif token_type == "BOOL_OR":
+                return operand1 or operand2
+            elif token_type == "BOOL_XOR":
+                return operand1 != operand2  # XOR is True if exactly one operand is True
+
+        else:
+            print(f"Error: Expected boolean operator, but found '{token_type}'.")
+            return None
+
     
     def parse_boolean_operand(self):
         """Parse boolean operands."""
@@ -592,7 +662,7 @@ class SemanticAnalyzer:
             return self.parse_boolean_op()  # Parse NOT operation
         
         print("Error: Expected boolean operand.")
-        return False
+        return None
 
     def parse_comparison_op(self):
         """Parse a comparison expression."""
