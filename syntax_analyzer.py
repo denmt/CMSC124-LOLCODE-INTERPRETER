@@ -100,6 +100,7 @@ class SyntaxAnalyzer:
             elif not self.parse_expressions():
                 print(f"Error: Unexpected token '{token_type}' in statements.")
                 return False
+            
         return True
 
     def parse_expressions(self):
@@ -141,9 +142,9 @@ class SyntaxAnalyzer:
                 self.current_index -= 1  # Move back to the variable identifier
                 return self.parse_assignment()
             else:
-                print(f"Error: Unexpected token after variable identifier '{next_token}'.")
-                return False
-
+                self.current_index -= 1  # Move back to the variable identifier
+                self.match("VARIABLE_IDENTIFIER")
+                return True
         # Unrecognized token
         print(f"Error: Unexpected token '{token_type}' in expressions.")
         return False
@@ -223,6 +224,10 @@ class SyntaxAnalyzer:
             if not self.match("VARIABLE_IDENTIFIER"):
                 print("Error: Expected a variable identifier after 'MAEK'.")
                 return False
+            if not self.match("TYPE_ASSIGNMENT"):  # Consume "A"
+                print("Error: Expected Type Assignment keyword after 'MAEK' and variable identifier.")
+                return False
+            
             if not self.match("TYPE_LITERAL"):
                 print("Error: Expected a valid type literal to typecast.")
                 return False
