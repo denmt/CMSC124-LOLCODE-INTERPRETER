@@ -140,10 +140,10 @@ class SemanticAnalyzer:
             else:
                 self.current_index -= 1  # Move back to the variable identifier
                 self.match("VARIABLE_IDENTIFIER")
-                return True
         # Unrecognized token
         print(f"Error: Unexpected token '{token_type}' in expressions.")
         return False
+
 
     def parse_statements(self):
         """Parse various statements in the program."""
@@ -164,9 +164,12 @@ class SemanticAnalyzer:
                     return False
 
             # Delegate to parse_expressions for handling statements
-            elif not self.parse_expressions():
-                print(f"Error: Unexpected token '{token_type}' in statements.")
-                return False
+            else:
+                result = self.parse_expressions()
+                if not result:
+                    return False
+                else:
+                    self.symbol_table["IT"] = result  # Store the result in IT variable
             
         return True
 
@@ -226,7 +229,7 @@ class SemanticAnalyzer:
 
         # Store the output in the console_output list
         self.console_output.append("".join(map(str, output_parts)))
-        return True
+        return value
 
         
     def parse_input_statement(self):
@@ -251,7 +254,7 @@ class SemanticAnalyzer:
                     return False
                 
                 self.symbol_table[var_name] = value
-        return True
+        return value
 
     
     def parse_assignment(self):
@@ -333,6 +336,42 @@ class SemanticAnalyzer:
 
         return True
 
+    def parse_typecast(self):
+        """Parse typecast operation."""
+        # Check for variable identifier
+        if not self.match("VARIABLE_IDENTIFIER"):
+            print("Error: Expected a variable identifier.")
+            return False
+
+        # Check for typecast operators (e.g., "IS NOW A" or "MAEK")
+        if self.get_current_token()[1] == "IS NOW A":
+            self.match("TYPECAST_OPERATOR")  # Consume "IS NOW A"
+            if not self.match("TYPE_LITERAL"):
+                print("Error: Expected a valid type literal.")
+                return False
+        elif self.get_current_token()[1] == "MAEK":
+            self.match("TYPECAST_OPERATOR")  # Consume "MAEK"
+            if not self.match("VARIABLE_IDENTIFIER"):
+                print("Error: Expected a variable identifier after 'MAEK'.")
+                return False
+
+            # Handle type assignment or direct type literals
+            token_type = self.get_current_token()[0]
+            if token_type == "TYPE_ASSIGNMENT":
+                self.match("TYPE_ASSIGNMENT")  # Consume "ITZ A"
+                if not self.match("TYPE_LITERAL"):
+                    print("Error: Expected a valid type literal after 'ITZ A'.")
+                    return False
+            elif token_type == "TYPE_LITERAL":
+                self.match("TYPE_LITERAL")
+            else:
+                print("Error: Expected a valid type literal or type assignment.")
+                return False
+        else:
+            print("Error: Expected 'IS NOW A' or 'MAEK' as typecast operator.")
+            return False
+        return True
+
     def parse_arithmetic_op(self):
         """Parse and evaluate arithmetic operation."""
         operator = self.get_current_token()[0]
@@ -381,43 +420,6 @@ class SemanticAnalyzer:
             print(f"Error: Expected arithmetic operator, but found '{operator}'.")
             return None
 
-    def parse_typecast(self):
-        """Parse typecast operation."""
-        # Check for variable identifier
-        if not self.match("VARIABLE_IDENTIFIER"):
-            print("Error: Expected a variable identifier.")
-            return False
-
-        # Check for typecast operators (e.g., "IS NOW A" or "MAEK")
-        if self.get_current_token()[1] == "IS NOW A":
-            self.match("TYPECAST_OPERATOR")  # Consume "IS NOW A"
-            if not self.match("TYPE_LITERAL"):
-                print("Error: Expected a valid type literal.")
-                return False
-        elif self.get_current_token()[1] == "MAEK":
-            self.match("TYPECAST_OPERATOR")  # Consume "MAEK"
-            if not self.match("VARIABLE_IDENTIFIER"):
-                print("Error: Expected a variable identifier after 'MAEK'.")
-                return False
-
-            # Handle type assignment or direct type literals
-            token_type = self.get_current_token()[0]
-            if token_type == "TYPE_ASSIGNMENT":
-                self.match("TYPE_ASSIGNMENT")  # Consume "ITZ A"
-                if not self.match("TYPE_LITERAL"):
-                    print("Error: Expected a valid type literal after 'ITZ A'.")
-                    return False
-            elif token_type == "TYPE_LITERAL":
-                self.match("TYPE_LITERAL")
-            else:
-                print("Error: Expected a valid type literal or type assignment.")
-                return False
-        else:
-            print("Error: Expected 'IS NOW A' or 'MAEK' as typecast operator.")
-            return False
-
-        return True
-    
     def parse_arith_operand(self):
         """Parse and return the value of operands in an arithmetic expression."""
         token_type = self.get_current_token()[0]
@@ -625,7 +627,7 @@ class SemanticAnalyzer:
             comparison_operand = self.comparison_operand()  # Parse the additional operand
             if comparison_operand is None:
                 print("Error: Invalid comparison operand after 'BIGGR OF' or 'SMALLR OF'.")
-                return None
+                return False
 
             # Update operand1 based on BIGGR or SMALLR
             if token_type == "EXPR_BIGGR":
@@ -636,35 +638,62 @@ class SemanticAnalyzer:
             # Match the next 'AN' separator
             if not self.match("OPERATOR_SEPARATOR"):
                 print("Error: Expected 'AN' after 'BIGGR OF' or 'SMALLR OF'.")
-                return None
+                return False
 
         # Parse the second operand
         operand2 = self.comparison_operand()
         if operand2 is None:
             print("Error: Invalid second comparison operand.")
-            return None
+            return False
 
         # Perform the comparison
         if operator == "COMPARE_EQUALS":
             if token_type == "EXPR_BIGGR":
                 print(">=")
-                return operand1 >= operand2
+                value = operand1 >= operand2
+                if value:
+                    return "WIN"
+                else:
+                    return "FAIL"
+                
             elif token_type == "EXPR_SMALLR":
                 print("<=")
-                return operand1 <= operand2
+                value = operand1 <= operand2
+                if value:
+                    return "WIN"
+                else:
+                    return "FAIL"
             else:
                 print("==")
-                return operand1 == operand2
+                value = operand1 == operand2
+                if value:
+                    return "WIN"
+                else:
+                    return "FAIL"
+                
         elif operator == "COMPARE_DIFF":
             if token_type == "EXPR_BIGGR":
                 print("<")
-                return operand1 < operand2
+                value = operand1 < operand2
+                if value:
+                    return "WIN"
+                else:
+                    return "FAIL"
+                
             elif token_type == "EXPR_SMALLR":
                 print(">")
-                return operand1 > operand2
+                value = operand1 > operand2
+                if value:
+                    return "WIN"
+                else:
+                    return "FAIL"
             else:
                 print("!=")
-                return operand1 != operand2
+                value = operand1 != operand2
+                if value:
+                    return "WIN"
+                else:
+                    return "FAIL"
 
         print("Error: Unexpected comparison syntax.")
         return False
@@ -681,16 +710,20 @@ class SemanticAnalyzer:
             if var_name not in self.symbol_table:
                 print(f"Error: Variable '{var_name}' not declared.")
                 return None
-            value = self.symbol_table[var_name]
+            try:
+                value = int(self.symbol_table[var_name])
+            except ValueError:
+                print(f"Error: Invalid comparison operand in variable '{var_name}'.")
+                return None
             self.match("VARIABLE_IDENTIFIER")
             return value
+            
         elif token_type[0] in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT", "EXPR_MOD", "EXPR_BIGGR", "EXPR_SMALLR"]:
             return self.parse_arithmetic_op()
 
         print(f"Error: Expected valid operand, but found '{token_type[0]}'.")
         return None
 
-    
     def parse_literal(self):
         """Parse Literals."""
         token_type = self.get_current_token()[0]
@@ -711,35 +744,74 @@ class SemanticAnalyzer:
     
     def parse_if_statement(self):
         """Parse if statement."""
+        
+        # Get the value of IT variable.
+        it_value = self.symbol_table.get("IT", None)
+        if it_value is None:
+            print("Error: 'IT' variable not found.")
+            return False
+        
+        if it_value not in ["WIN", "FAIL"]:
+            try:
+                it_value = int(it_value)
+            except ValueError:
+                print("Error: Invalid 'IT' value. Expected a number or TROOF.")
+
+        # Typecast the value of IT to TROOF.
+        if it_value == 1:
+            it_value = "WIN"
+        elif it_value == 0:
+            it_value = "FAIL"
+
+        # Check if the value of IT is valid
+
+        print(f"IT value: {it_value}")
+
+        # Match the "O RLY?" token to start the IF block
         if not self.match("IF_START"):
             print("Error: Expected 'O RLY?'.")
             return False
-
-        # Handle the "YA RLY" block
-        if not self.match("IF_YES"):
-            print("Error: Expected 'YA RLY'.")
-            return False
-
-        # Parse the statements under "YA RLY"
-        while self.get_current_token():
-            if self.match("CONDITIONAL_END"):
-                return True  # End of the IF block
-            if self.get_current_token()[0] == "IF_NO":
-                break  # Transition to "NO WAI"
-            if not self.parse_expressions():
+        
+        if it_value == "WIN":
+            # Handle the "YA RLY" block
+            if not self.match("IF_YES"):
+                print("Error: Expected 'YA RLY'.")
                 return False
 
-        # Handle the "NO WAI" block if present
-        if not self.match("IF_NO"):
-            print("Error: Expected 'NO WAI'.")
-            return False
+            # Parse the statements under "YA RLY"
+            while self.get_current_token():
+                if self.match("CONDITIONAL_END"):
+                    return True  # End of the IF block
+                if self.match("IF_NO"):
+                    break  # Transition to "NO WAI" block
+                if not self.parse_expressions():
+                    return False
 
-        # Parse the statements under "NO WAI"
-        while self.get_current_token():
-            if self.match("CONDITIONAL_END"):
-                return True  # End of the IF block
-            if not self.parse_expressions():
+            # After the "IF_YES" block, handle the "NO WAI" transition if necessary
+            while self.get_current_token():
+                if self.match("CONDITIONAL_END"):
+                    return True  # End of the IF block
+                else:
+                    self.consume()  # Skip the tokens in the "NO WAI" block
+
+        elif it_value == "FAIL":
+            # Skip until the "IF_NO" token in case of the else-clause
+            while self.get_current_token() and self.get_current_token()[0] != "IF_NO":
+                if self.match("CONDITIONAL_END"):
+                    print("Warning - 'NO WAI' block not found.")
+                    return True  # End of the IF block
+                self.consume()
+
+            # Handle the "NO WAI" block
+            if not self.match("IF_NO"):
+                print("Error: Expected 'NO WAI'.")
                 return False
+            
+            while self.get_current_token():
+                if self.match("CONDITIONAL_END"):
+                    return True  # End of the IF block
+                if not self.parse_expressions():
+                    return False
 
         print("Error: Expected 'OIC' to close the if statement.")
         return False
