@@ -76,8 +76,6 @@ class SyntaxAnalyzer:
                 elif not self.parse_comparison_op():
                     print("Error: Invalid variable initialization.")
                     return False
-            
-
         return True
 
     def parse_statements(self):
@@ -209,9 +207,7 @@ class SyntaxAnalyzer:
                 return False
             if not self.parse_operand():
                 return False
-            else:
-                if not self.parse_operand():
-                    return False
+
         else:
             return False
         return True
