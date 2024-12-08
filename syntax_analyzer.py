@@ -129,6 +129,10 @@ class SyntaxAnalyzer:
             elif token_type == "LOOP_START":
                 if not self.parse_loop_statement():
                     return False
+                
+            elif token_type == "SWITCH_START":
+                if not self.parse_switch_statement():
+                    return False
 
             elif token_type == "FUNCTION_DEF":
                 if not self.parse_function_definition():
@@ -494,46 +498,136 @@ class SyntaxAnalyzer:
 
     def parse_loop_statement(self):
         """Parse loop statement."""
-        if not self.match("LOOP_START"):
+        # Match the start of the loop
+        if not self.match("LOOP_START"):  # 'IM IN YR'
             print("Error: Expected 'IM IN YR'.")
             return False
-        if not self.match("LOOP_IDENTIFIER"):  # Loop label
-            print("Error: Expected loop label.")
+
+        # Match the loop label
+        if not self.match("LOOP_IDENTIFIER"):  # e.g., 'asc' or 'desc'
+            print("Error: Expected loop label after 'IM IN YR'.")
             return False
-        if not self.match("LOOP_OPERATION"):  # UPPIN or NERFIN
+
+        # Match the operation (UPPIN or NERFIN)
+        if not self.match("LOOP_OPERATION"):  # 'UPPIN' or 'NERFIN'
             print("Error: Expected 'UPPIN' or 'NERFIN'.")
             return False
-        if not self.match("DELIMITER"):  # Expecting 'YR'
-            print("Error: Expected 'YR'.")
+
+        # Match the delimiter
+        if not self.match("DELIMITER"):  # 'YR'
+            print("Error: Expected 'YR' after 'UPPIN' or 'NERFIN'.")
             return False
+
+        # Match the loop variable
         if not self.match("VARIABLE_IDENTIFIER"):  # Loop variable
-            print("Error: Expected loop variable.")
+            print("Error: Expected a variable after 'YR'.")
             return False
-        
-        if not self.match("LOOP_CONDITION"):  # TIL or WILE
+
+        # Match the loop condition (TIL or WILE)
+        if not self.match("LOOP_CONDITION"):  # 'TIL' or 'WILE'
             print("Error: Expected 'TIL' or 'WILE'.")
             return False
-        
-        if not self.parse_comparison_op():
+
+        # Parse the loop condition expression
+        if not self.parse_expressions():  # Expression after 'TIL' or 'WILE'
+            print("Error: Failed to parse loop condition expression.")
             return False
-        
+
+        # Parse the body of the loop
         while self.get_current_token():
-            if self.match("LOOP_END"):
-                if not self.match("LOOP_IDENTIFIER"):
-                    print("Error: Expected loop label.")
+            # End of the loop block
+            if self.match("LOOP_END"):  # 'IM OUTTA YR'
+                if self.match("LOOP_IDENTIFIER"):  # Match the loop label
+                    return True
+                else:
+                    print("Error: Expected loop label after 'IM OUTTA YR'.")
                     return False
-            
+
+            # Parse loop body expressions
             if not self.parse_expressions():
                 return False
-        
-        if not self.match("LOOP_END"):  # IM OUTTA YR
-            print("Error: Expected 'IM OUTTA YR'.")
-            return False
-        if not self.match("LOOP_IDENTIFIER"):
-            print("Error: Expected loop label.")
-            return False
-        return True
+
+        # If we exit the loop without finding 'IM OUTTA YR'
+        print("Error: Expected 'IM OUTTA YR' to end the loop.")
+        return False
+
     
+    def parse_switch_statement(self):
+        """Parse a switch-case statement."""
+        if not self.match("SWITCH_START"):
+            print("Error: Expected 'WTF?'.")
+            return False
+
+        encountered_default = False
+
+        while self.get_current_token():
+            token_type = self.get_current_token()[0]
+
+            # Parse each case or default block using switch_case
+            if token_type in ["SWITCH_CASE", "SWITCH_DEFAULT"]:
+                if token_type == "SWITCH_DEFAULT":
+                    if encountered_default:
+                        print("Error: Multiple 'OMGWTF' blocks are not allowed.")
+                        return False
+                    encountered_default = True
+
+                if not self.switch_case():
+                    return False
+
+            # Handle the end of the switch statement
+            elif token_type == "CONDITIONAL_END":
+                self.match("CONDITIONAL_END")
+                return True
+
+            else:
+                print(f"Error: Unexpected token '{token_type}' in switch statement.")
+                return False
+
+        print("Error: Expected 'OIC' to close the switch statement.")
+        return False
+
+
+    def switch_case(self):
+        """Parse a single case or default block."""
+        token_type = self.get_current_token()[0]
+
+        # Handle case blocks
+        if token_type == "SWITCH_CASE":
+            self.match("SWITCH_CASE")  # Consume 'OMG'
+            if not self.match("NUMBR_LITERAL"):
+                print("Error: Expected a number literal for case block.")
+                return False
+
+            # Parse the statements within the case
+            while self.get_current_token():
+                exp_token = self.get_current_token()[0]
+                if exp_token in ["SWITCH_CASE", "SWITCH_DEFAULT"]:
+                    break
+                elif exp_token == "BREAK":  # Break out of the current case
+                    self.match("BREAK")
+                    break
+                if not self.parse_expressions():
+                    return False
+
+        # Handle the default block
+        elif token_type == "SWITCH_DEFAULT":
+            self.match("SWITCH_DEFAULT")
+
+            # Parse the statements within the default case
+            while self.get_current_token():
+                next_token = self.get_current_token()[0]
+                if next_token == "CONDITIONAL_END":  # End of the switch-case
+                    return True
+                if not self.parse_expressions():
+                    return False
+                
+        # Handle unexpected cases
+        else:
+            print(f"Error: Unexpected token '{token_type}' in switch-case.")
+            return False
+
+        return True
+
     def parse_expressions(self):
         '''Parse expressions.'''
         token_type = self.get_current_token()[0]
@@ -554,6 +648,8 @@ class SyntaxAnalyzer:
             return self.parse_input_statement()
         elif token_type == "TYPECAST_OPERATOR":
             return self.parse_typecast()
+        elif token_type == "SWITCH_START":
+            return self.parse_switch_statement()
         elif token_type == "VARIABLE_IDENTIFIER":
             return self.parse_assignment()
         elif token_type == "IF_START":
@@ -563,7 +659,7 @@ class SyntaxAnalyzer:
         elif token_type == "FUNCTION_CALL":
             return self.parse_function_call()
         else:
-            print(f"Error: Unexpected token '{token_type}'.")
+            print(f"Error: Unexpected token '{token_type}' in expressions.")
             return False
 
     def parse_function_definition(self):
