@@ -332,7 +332,35 @@ class SemanticAnalyzer:
             value = float(self.get_current_token()[1])
             self.match("NUMBAR_LITERAL")  # Consume the token
             return value
+        elif token_type == "TROOF_LITERAL":
+            value = self.get_current_token()[1]
+            if value == "WIN":
+                self.match("TROOF_LITERAL")
+                return 1
+            elif value == "FAIL":
+                self.match("TROOF_LITERAL")
+                return 0
+        elif token_type == "YARN_LITERAL":
+            value = self.get_current_token()[1]
+            
+            # Remove the surrounding quotes from the string literal
+            if value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]  # Remove the first and last character (quotes)
+            
+            # Check if the value is a valid number (for numeric literals that are mistakenly labeled as YARN)
+            try:
+                if '.' in value:  # Check for decimal to decide float
+                    value = float(value)
+                else:  # Otherwise, treat as int
+                    value = int(value)
+            except ValueError:
+                # If it's not a valid number, it's treated as a string
+                pass
+            
+            self.match("YARN_LITERAL")  # Consume the token
+            return value
 
+        
         # Check for variables
         if token_type == "VARIABLE_IDENTIFIER":
             var_name = self.get_current_token()[1]
