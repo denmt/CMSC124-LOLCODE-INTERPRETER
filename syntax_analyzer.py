@@ -76,6 +76,7 @@ class SyntaxAnalyzer:
                 elif not self.parse_comparison_op():
                     print("Error: Invalid variable initialization.")
                     return False
+            
 
         return True
 
@@ -102,7 +103,15 @@ class SyntaxAnalyzer:
             elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT"]:
                 if not self.parse_arithmetic_op():
                     return False
+                
+            elif token_type in ["BOOL_ALL_OF", "BOOL_ANY_OF"]:
+                if not self.parse_infinite_boolean_op():
+                    return False
             
+            elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT", "BOOL_ALL_OF", "BOOL_ANY_OF"]:
+                if not self.parse_boolean_op():
+                    return False
+                
             elif token_type in ["COMPARE_EQUALS", "COMPARE_DIFF"]:
                 if not self.parse_comparison_op():
                     return False
@@ -141,14 +150,13 @@ class SyntaxAnalyzer:
         
         token_type = self.get_current_token()[0]
         if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
-            self.parse_literal()
+            self.parse_literal() 
         elif token_type == "VARIABLE_IDENTIFIER":
             self.match("VARIABLE_IDENTIFIER")
-        else:
-            if not self.parse_statements():
-                print("Error: Invalid print argument.")
-                return False
-
+        elif not self.parse_statements():
+            print("Error: Invalid print argument.")
+            return False
+        
         while self.match("PRINT_CAT"):
             token_type = self.get_current_token()[0]
             if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
@@ -159,9 +167,8 @@ class SyntaxAnalyzer:
                 if not self.parse_statements():
                     print("Error: Invalid print argument.")
                     return False
-            
         return True
-        
+    
     def parse_input_statement(self):
         """Parse GIMMEH statement."""
         if not self.match("INPUT_KEYWORD"):
@@ -207,31 +214,79 @@ class SyntaxAnalyzer:
                     return False
         else:
             return False
-        
         return True
     
+    def parse_infinite_boolean_op(self):
+        """Parse infinite boolean expressions like ALL OF or ANY OF."""
+        if not (self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF")):
+            return False  # Must start with ALL OF or ANY OF
+
+        has_operand = False  # Track if we have at least one operand
+
+        while self.get_current_token():
+            token_type = self.get_current_token()[0]
+
+            if token_type == "CLOSING_KEYWORD":  # End of the boolean operation
+                self.match("CLOSING_KEYWORD")
+                if not has_operand:
+                    print("Error: Expected at least one operand before 'MKAY'.")
+                    return False
+                return True
+
+            elif token_type in ["NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL", "VARIABLE_IDENTIFIER"]:  # Parse operands
+                self.match(token_type)
+                has_operand = True
+
+            elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR", "BOOL_NOT"]:
+                if not self.parse_boolean_op():
+                    return False
+                has_operand = True
+
+            elif token_type == "OPERATOR_SEPARATOR":  # 'AN' as a separator
+                if not has_operand:
+                    print("Error: Unexpected 'AN' without a preceding operand.")
+                    return False
+                self.match("OPERATOR_SEPARATOR")  # Consume the 'AN'
+
+            else:
+                print(f"Error: Unexpected token '{token_type}'.")
+                return False
+
+        # If the loop exits without finding CLOSING_KEYWORD
+        print("Error: Expected 'MKAY' to close the boolean expression.")
+        return False
+          
     def parse_boolean_op(self):
-        '''Parse boolean operations'''
-        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR") or self.match("BOOL_NOT"):
-            if not self.parse_operand():
+        """Parse boolean expressions."""
+        if self.match("BOOL_AND") or self.match("BOOL_OR") or self.match("BOOL_XOR"):
+            if not self.parse_boolean_operand():
+                print("Error: Expected boolean operand.")
                 return False
             if not self.match("OPERATOR_SEPARATOR"):  # Expect 'AN'
                 print("Error: Expected 'AN'.")
                 return False
-            if not self.parse_operand():
+            if not self.parse_boolean_operand():
                 return False
-        elif self.match("BOOL_ALL_OF") or self.match("BOOL_ANY_OF"):
-            while self.match("CLOSING_KEYWORD"):
-                if not self.parse_operand():
-                    return False
-                if not self.match("OPERATOR_SEPARATOR"):
-                    print("Error: Expected 'AN'.")
-                    return False
-                if not self.parse_operand():
-                    return False
-                
-                
-
+        elif self.match("BOOL_NOT"):
+            if not self.parse_boolean_operand():
+                return False
+            
+        return True
+    
+    def parse_boolean_operand(self):
+        """Parse boolean operands."""
+        token_type = self.get_current_token()[0]  # Get current token type
+        if token_type in ["NUMBR_LITERAL","NUMBAR_LITERAL","TROOF_LITERAL", "VARIABLE_IDENTIFIER"]:
+            self.match(token_type)  # Consume the operand
+            return True
+        elif token_type in ["BOOL_AND", "BOOL_OR", "BOOL_XOR"]:
+            return self.parse_boolean_op()  # Parse nested boolean op
+        elif token_type == "BOOL_NOT":
+            return self.parse_boolean_op()  # Parse NOT operation
+        
+        print("Error: Expected boolean operand.")
+        return False
+        
     def parse_comparison_op(self):
         """Parse a comparison expression."""
         if self.match("COMPARE_EQUALS") or self.match("COMPARE_DIFF"):
@@ -252,6 +307,7 @@ class SyntaxAnalyzer:
                                 
             if not self.parse_operand():
                 return False
+        return True
                   
     def parse_operand(self):
         """Parse operands in an expression (NUMBR, NUMBAR, YARN, etc.)."""
