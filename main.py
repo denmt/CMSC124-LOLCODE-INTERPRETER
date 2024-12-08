@@ -41,8 +41,7 @@ def execute():
             messagebox.showinfo("Success", "Syntax is correct!")
         else:
             messagebox.showerror("Error", "Syntax error in code!")
-            
-            return # Stop further processing if syntax is incorrect
+            return  # Stop further processing if syntax is incorrect
 
         # Create an instance of SemanticAnalyzer to perform semantic checks and execute the code
         semantic_analyzer = SemanticAnalyzer(tokens)
@@ -51,18 +50,17 @@ def execute():
             messagebox.showinfo("Success", "Program executed successfully!")
         else:
             messagebox.showerror("Error", "Semantic error in code!")
+            return  # Stop further processing if semantic analysis fails
 
         # Token output display
         token_output.delete(1.0, tk.END)
         for token in tokens:
             token_output.insert(tk.END, f"{token}\n")
-        
 
-        # Clear the symbol table before inserting new values
+        # Clear and display the symbol table
         for row in symbol_table.get_children():
             symbol_table.delete(row)
 
-        # Display the symbol table in the Treeview widget
         for var, value in semantic_analyzer.symbol_table.items():
             symbol_table.insert("", "end", values=(var, value))
         
