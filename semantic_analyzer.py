@@ -199,7 +199,7 @@ class SemanticAnalyzer:
             output_parts.append(value)
 
         # Parse concatenated arguments
-        while self.match("PRINT_CAT"):  # Match "!"
+        while self.match("PRINT_CAT") or self.match("OPERATOR_SEPARATOR"):  # Match "!"
             token_type = self.get_current_token()[0]
             if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
                 value = self.parse_literal()
@@ -251,24 +251,81 @@ class SemanticAnalyzer:
     
     def parse_assignment(self):
         """Parse variable assignment."""
-        if not self.match("VARIABLE_IDENTIFIER"):
-            print("Error: Expected a variable identifier.")
-            return False
+        token_type = self.get_current_token()[0]
         
-        variable_name = self.tokens[self.current_index - 1][1]
+        if token_type == "VARIABLE_IDENTIFIER":
+            var_name = self.get_current_token()[1]
+            if var_name not in self.symbol_table:
+                print(f"Error: Variable '{var_name}' not declared.")
+                return False
+            self.match("VARIABLE_IDENTIFIER")
         
         if not self.match("ASSIGNMENT"):  # Expecting 'R'
             print("Error: Expected 'R'.")
             return False
 
-        value = self.evaluate_expression()
-        if value is None:
-            print("Error: Invalid assignment value.")
-            return False
-        
-        # Update variable in the symbol table
-        self.symbol_table[variable_name] = value
-        print(f"Variable updated: {variable_name} = {value}")
+        token_type = self.get_current_token()[0]
+
+        if token_type in ["YARN_LITERAL", "NUMBR_LITERAL", "NUMBAR_LITERAL", "TROOF_LITERAL"]:
+            value = self.parse_literal()
+            self.symbol_table[var_name] = value
+
+        elif token_type in ["TYPECAST_OPERATOR"]:
+            if not self.match("TYPECAST_OPERATOR"):  # Consume "MAEK"
+                return False
+            varident = self.get_current_token()
+            if varident[0] == "VARIABLE_IDENTIFIER":
+                var_name1 = varident[1]
+                if var_name != var_name1:
+                    print("Error: Variable name mismatch.")
+                    return False
+                else: 
+                    self.match("VARIABLE_IDENTIFIER")
+
+            if not self.match("TYPE_ASSIGNMENT"):  # Consume "A"
+                print("Error: Expected Type Assignment keyword after 'MAEK' and variable identifier.")
+                return False
+            
+            var_type = self.get_current_token()
+            if var_type[0] == "TYPE_LITERAL":
+                if var_type[1] == "YARN":
+                    # Change the variable to string.
+                    self.symbol_table[var_name] = '"' + str(self.symbol_table[var_name]) + '"'
+                elif var_type[1] == "NUMBR":
+                    self.symbol_table[var_name] = int(self.symbol_table[var_name])
+                elif var_type[1] == "NUMBAR":
+                    self.symbol_table[var_name] = float(self.symbol_table[var_name])
+                elif var_type[1] == "TROOF":
+                    if self.symbol_table[var_name] == 1 or self.symbol_table[var_name] == "1":
+                        self.symbol_table[var_name] = "WIN"
+                    elif self.symbol_table[var_name] == 0 or self.symbol_table[var_name] == "0":
+                        self.symbol_table[var_name] = "FAIL"
+                else:
+                    print("Error: Invalid type.")
+                    return False
+                self.match("TYPE_LITERAL")
+            else:
+                print("Error: Expected a valid type literal.")
+                return False
+
+        elif token_type == "VARIABLE_IDENTIFIER":
+            value = self.get_current_token()[1]
+            if value not in self.symbol_table:
+                print(f"Error: Variable '{value}' not declared.")
+                return False
+            self.symbol_table[var_name] = self.symbol_table[value]
+            self.match("VARIABLE_IDENTIFIER")
+
+        elif token_type == "CONCAT":
+            if not self.parse_concat():
+                return False
+        else:
+            value = self.parse_expressions()
+            if value is None:
+                print("Error: Invalid assignment value.")
+                return False
+            self.symbol_table[var_name] = value
+
         return True
 
     def parse_arithmetic_op(self):
@@ -434,14 +491,29 @@ class SemanticAnalyzer:
         """Parse string concatenation."""
         if not self.match("CONCAT"):
             return False
-
+        
+        value = ""  # Initialize the concatenated value
         while True:
-            token_type = self.get_current_token()[0]
-            if token_type in ["YARN_LITERAL", "VARIABLE_IDENTIFIER"]:
-                self.match(token_type)
-            elif token_type == "CONCAT":
-                if not self.parse_concat():
+            token_type = self.get_current_token()
+            if token_type[0] == "YARN_LITERAL":
+                value = value + token_type[1]
+                self.match("YARN_LITERAL")
+            if token_type[0] == "NUMBR_LITERAL":
+                value = value + str(token_type[1])
+                self.match("NUMBR_LITERAL")
+            if token_type[0] == "NUMBAR_LITERAL":
+                value = value + str(token_type[1])
+                self.match("NUMBAR_LITERAL")
+            elif token_type[0] == "TROOF_LITERAL":
+                value = value + token_type[1]
+                self.match("TROOF_LITERAL")
+            elif token_type[0] == "VARIABLE_IDENTIFIER":
+                var_name = token_type[1]
+                if var_name not in self.symbol_table:
+                    print(f"Error: Variable '{var_name}' not declared.")
                     return False
+                value = value + self.symbol_table[var_name]
+                self.match("VARIABLE_IDENTIFIER")
             else:
                 print("Error: Invalid concatenation value.")
                 return False
@@ -449,7 +521,7 @@ class SemanticAnalyzer:
             if not self.match("OPERATOR_SEPARATOR"):
                 break  # End of concatenation chain
 
-        return True
+        return value
 
     def parse_infinite_boolean_op(self):
         """Parse infinite boolean expressions like ALL OF or ANY OF."""
@@ -575,10 +647,7 @@ class SemanticAnalyzer:
         elif token_type in ["YARN_LITERAL"]:
             value = value[1:-1]  # Remove the quotes from the string
         elif token_type == "TROOF_LITERAL":
-            if value == "WIN":
-                value = True
-            else:
-                value = False
+            value = value
         else:
             print(f"Error: Expected literal, but found '{token_type}'.")
             return None
