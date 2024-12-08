@@ -76,6 +76,15 @@ class SyntaxAnalyzer:
                 elif not self.parse_comparison_op():
                     print("Error: Invalid variable initialization.")
                     return False
+                elif not self.parse_function_call():
+                    print("Error: Invalid variable initialization.")
+                    return False
+                elif not self.parse_concat():
+                    print("Error: Invalid variable initialization.")
+                    return False
+                else:
+                    print("Error: Invalid variable initialization.")
+                    return False
         return True
 
     def parse_statements(self):
@@ -701,39 +710,13 @@ class SyntaxAnalyzer:
                 if not self.parse_return():
                     return False
 
-            # Handle output statements
-            elif token_type == "OUTPUT_KEYWORD":
-                if not self.parse_output_statement():
-                    return False
-
-            # Handle input statements
-            elif token_type == "INPUT_KEYWORD":
-                if not self.parse_input_statement():
-                    return False
-
-            # Handle expressions
-            elif token_type in ["EXPR_SUM", "EXPR_DIFF", "EXPR_PRODUKT", "EXPR_QUOSHUNT"]:
-                if not self.parse_arithmetic_op():
-                    return False
-
-            # Handle IF statements
-            elif token_type == "IF_START":
-                if not self.parse_if_statement():
-                    return False
-
-            # Handle loops
-            elif token_type == "LOOP_START":
-                if not self.parse_loop_statement():
-                    return False
-
-            # Handle function calls
-            elif token_type == "FUNCTION_CALL":
-                if not self.parse_function_call():
-                    return False
-
             # Handle breaks
             elif token_type == "BREAK":
                 self.match("BREAK")
+
+            # Parse expressions within the function body
+            elif not self.parse_expressions():
+                return False
 
             # Handle unexpected tokens to avoid errors
             else:
